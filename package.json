@@ -1,0 +1,26 @@
+{
+  "name": "striis",
+  "version": "0.1.0",
+  "description": "STRIIS - Agente de cibersegurança: escaneia falhas de segurança em URLs, no próprio servidor e em dependências, com dashboard web.",
+  "type": "module",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js"
+  },
+  "keywords": [
+    "security",
+    "scanner",
+    "cybersecurity",
+    "vulnerability",
+    "dashboard"
+  ],
+  "author": "Paulo",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}

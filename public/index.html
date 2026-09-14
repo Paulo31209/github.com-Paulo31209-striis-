@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>STRIIS — Agente de Cibersegurança</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo">🛡️</span>
+        <div>
+          <h1>STRIIS</h1>
+          <p class="tagline">Agente de cibersegurança — monitorando falhas em tempo real</p>
+        </div>
+      </div>
+      <div class="status" id="status">
+        <span class="dot"></span> conectando…
+      </div>
+    </header>
+
+    <main>
+      <!-- Cartões de resumo -->
+      <section class="cards" id="summary-cards">
+        <div class="card risk">
+          <span class="card-label">Nível de risco</span>
+          <span class="card-value" id="avg-risk">–</span>
+          <div class="risk-bar"><div class="risk-fill" id="risk-fill"></div></div>
+        </div>
+        <div class="card">
+          <span class="card-label">Scans realizados</span>
+          <span class="card-value" id="total-scans">–</span>
+        </div>
+        <div class="card sev-critical">
+          <span class="card-label">Críticas</span>
+          <span class="card-value" id="count-critical">–</span>
+        </div>
+        <div class="card sev-high">
+          <span class="card-label">Altas</span>
+          <span class="card-value" id="count-high">–</span>
+        </div>
+        <div class="card sev-medium">
+          <span class="card-label">Médias</span>
+          <span class="card-value" id="count-medium">–</span>
+        </div>
+        <div class="card sev-low">
+          <span class="card-label">Baixas</span>
+          <span class="card-value" id="count-low">–</span>
+        </div>
+      </section>
+
+      <div class="layout">
+        <!-- Painel de execução de scans -->
+        <section class="panel scan-runner">
+          <h2>Executar novo scan</h2>
+
+          <div class="scan-form">
+            <label>URL / site alvo</label>
+            <div class="row">
+              <input type="text" id="url-input" placeholder="ex.: exemplo.com" />
+              <button class="btn primary" data-scan="url">Escanear URL</button>
+            </div>
+          </div>
+
+          <div class="scan-form">
+            <label>Servidor onde o STRIIS roda</label>
+            <div class="row">
+              <button class="btn" data-scan="server">Analisar servidor</button>
+            </div>
+          </div>
+
+          <div class="scan-form">
+            <label>Dependências de um projeto</label>
+            <div class="row">
+              <input type="text" id="deps-input" placeholder="caminho do projeto (vazio = projeto atual)" />
+              <button class="btn" data-scan="deps">Verificar CVEs</button>
+            </div>
+          </div>
+
+          <div class="runner-status" id="runner-status"></div>
+        </section>
+
+        <!-- Lista de scans -->
+        <section class="panel scan-list">
+          <h2>Histórico de scans</h2>
+          <div id="scans-container" class="scans"></div>
+        </section>
+      </div>
+
+      <!-- Detalhe de findings -->
+      <section class="panel findings-panel" id="findings-panel" hidden>
+        <div class="findings-header">
+          <h2 id="findings-title">Detalhes do scan</h2>
+          <button class="btn ghost" id="close-findings">Fechar</button>
+        </div>
+        <div id="findings-container"></div>
+      </section>
+    </main>
+
+    <footer>
+      <p>STRIIS · rodando no servidor · <span id="footer-time"></span></p>
+    </footer>
+
+    <script src="app.js"></script>
+  </body>
+</html>
