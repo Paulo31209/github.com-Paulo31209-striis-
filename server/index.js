@@ -1,6 +1,7 @@
 // STRIIS — servidor principal.
 // Serve a API de scans e o dashboard web estático.
 
+import './lib/loadEnv.js'; // carrega .env antes de tudo
 import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
