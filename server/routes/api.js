@@ -6,6 +6,7 @@ import { scanDeps } from '../scanners/depScanner.js';
 import { saveScan, getScan, listScans, summary } from '../lib/store.js';
 import { parseIntent, replyForScan, replyForIntent } from '../lib/intent.js';
 import { getEngineStatus, runStrixScan } from '../lib/strix.js';
+import { getClaudeStatus, runClaudeReview } from '../lib/claudeAgent.js';
 import { createJob, jobView, appendLog, finishJob, failJob } from '../lib/jobs.js';
 
 export const api = express.Router();
@@ -21,8 +22,11 @@ api.get('/summary', (req, res) => {
 });
 
 // Status do engine Strix (instalado? docker? LLM configurado?).
+// Inclui também o status do engine Claude (CLI local headless).
 api.get('/engine', (req, res) => {
-  res.json(getEngineStatus());
+  const strix = getEngineStatus();
+  const claude = getClaudeStatus();
+  res.json({ ...strix, claude });
 });
 
 // Inicia um scan do Strix (assíncrono). Retorna um jobId para polling.
@@ -39,6 +43,19 @@ api.post('/scans/strix', (req, res) => {
   const mode = (req.body?.mode || '').trim() || undefined;
   const instruction = (req.body?.instruction || '').trim() || undefined;
   const job = startStrixJob({ target, mode, instruction });
+  res.status(202).json(jobView(job.id));
+});
+
+// Inicia uma análise com o Claude local (assíncrono). Retorna jobId.
+// Body: { target }
+api.post('/scans/claude', (req, res) => {
+  const target = (req.body?.target || '').trim();
+  if (!target) return res.status(400).json({ error: 'Informe o campo "target".' });
+  const claude = getClaudeStatus();
+  if (!claude.available) {
+    return res.status(503).json({ error: `Claude indisponível. ${claude.reason}`, claude });
+  }
+  const job = startClaudeJob({ target });
   res.status(202).json(jobView(job.id));
 });
 
@@ -151,13 +168,68 @@ function startStrixJob({ target, mode, instruction }) {
   return job;
 }
 
+// Inicia um job de análise com o Claude local em background.
+function startClaudeJob({ target }) {
+  const job = createJob({ type: 'claude', target });
+  const startedAt = new Date().toISOString();
+  (async () => {
+    try {
+      const result = await runClaudeReview({ target, onLog: (l) => appendLog(job.id, l) });
+      const finishedAt = new Date().toISOString();
+      const scan = saveScan({
+        type: 'claude',
+        target,
+        findings: result.findings,
+        startedAt,
+        finishedAt,
+      });
+      appendLog(job.id, `✅ Análise concluída: ${result.findings.length} achado(s).`);
+      finishJob(job.id, { scanId: scan.id });
+    } catch (err) {
+      appendLog(job.id, `❌ Erro: ${err.message}`);
+      failJob(job.id, err);
+    }
+  })();
+  return job;
+}
+
 // Comando em linguagem natural: interpreta a intenção e roda o(s) scan(s).
-// Body: { text: "faça uma varredura no meu sistema e encontre falhas", engine?: "strix"|"builtin" }
+// Body: { text: "...", engine?: "strix"|"claude"|"builtin" }
 api.post('/command', async (req, res) => {
   const text = (req.body?.text || '').trim();
   if (!text) return res.status(400).json({ error: 'Informe o campo "text".' });
 
   const intent = parseIntent(text);
+
+  // Engine Claude: usuário pediu explicitamente (palavra "claude") ou engine=claude.
+  const wantsClaude = req.body?.engine === 'claude' || /\bclaude\b/i.test(text);
+  if (wantsClaude) {
+    const claude = getClaudeStatus();
+    if (!intent.target) {
+      return res.json({
+        intent,
+        reply:
+          '🤖 Pra analisar com o Claude eu preciso de um alvo (URL). ' +
+          'Ex.: *"analise a segurança do exemplo.com com claude"*.',
+        scans: [],
+      });
+    }
+    if (!claude.available) {
+      return res.json({
+        intent,
+        reply: `⚠️ O Claude local não está pronto. ${claude.reason}`,
+        claude,
+        scans: [],
+      });
+    }
+    const job = startClaudeJob({ target: intent.target });
+    return res.json({
+      intent,
+      reply: `🤖 Analisando **${intent.target}** com o **Claude do servidor** (sua assinatura, sem custo de API). Um instante… 👇`,
+      job: jobView(job.id),
+      scans: [],
+    });
+  }
 
   // Modo profundo (Strix): usuário pediu explicitamente OU o front está em modo Strix.
   const wantsStrix =

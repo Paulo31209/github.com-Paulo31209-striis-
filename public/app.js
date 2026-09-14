@@ -10,7 +10,7 @@ const SEV_LABEL = {
   low: 'Baixa',
   info: 'Info',
 };
-const TYPE_LABEL = { url: 'URL', server: 'Servidor', deps: 'Deps', strix: 'Strix AI' };
+const TYPE_LABEL = { url: 'URL', server: 'Servidor', deps: 'Deps', strix: 'Strix AI', claude: 'Claude' };
 
 let engineAvailable = false; // Strix pronto no servidor?
 let deepMode = false; // usar modo profundo (Strix)?
