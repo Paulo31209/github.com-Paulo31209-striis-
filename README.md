@@ -95,6 +95,15 @@ Strix no mesmo servidor onde o STRIIS roda:
 > ⚠️ O Strix consome créditos do seu LLM e roda pentest de verdade. Use apenas
 > em **alvos autorizados**.
 
+## 🚀 Deploy (publicar num domínio)
+
+Para publicar o dashboard num subdomínio (ex.: `scan.girabot.com.br`) via
+**Cloudflare Tunnel** e rodar o STRIIS como serviço (systemd), veja
+**[docs/DEPLOY.md](docs/DEPLOY.md)**.
+
+> ⚠️ O dashboard ainda **não tem login**. Ao expor publicamente, proteja com
+> **Cloudflare Access** (instruções no guia de deploy).
+
 ## API
 
 | Método | Rota | Descrição |

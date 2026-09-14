@@ -1,0 +1,27 @@
+# Serviço systemd para o STRIIS.
+# Instale com:
+#   sudo cp scripts/striis.service /etc/systemd/system/striis.service
+#   sudo systemctl daemon-reload && sudo systemctl enable --now striis
+#
+# Ajuste User/WorkingDirectory se o seu usuário/caminho forem diferentes.
+
+[Unit]
+Description=STRIIS - Agente de Ciberseguranca (dashboard + orquestrador Strix)
+After=network.target docker.service
+Wants=docker.service
+
+[Service]
+Type=simple
+User=saulo
+WorkingDirectory=/home/saulo/striis
+# Lê o .env do próprio projeto (o STRIIS já faz isso), mas deixamos explícito:
+EnvironmentFile=-/home/saulo/striis/.env
+ExecStart=/usr/bin/env node server/index.js
+Restart=on-failure
+RestartSec=5
+# Endurecimento básico:
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
