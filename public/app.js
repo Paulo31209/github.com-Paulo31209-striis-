@@ -253,6 +253,55 @@ async function sendChat(text) {
   }
 }
 
+// Upload de um .zip do código → revisão de segurança completa pelo Claude.
+async function uploadZip(file) {
+  if (!file) return;
+  addMessage('user', '📎 ' + escapeHtml(file.name));
+  const typing = addMessage(
+    'bot typing',
+    '📦 Descompactando e analisando o código… (pode levar alguns minutos)',
+  );
+  try {
+    const res = await fetch(
+      `/api/chat/upload?conversationId=${encodeURIComponent(conversationId)}&name=${encodeURIComponent(file.name)}`,
+      { method: 'POST', headers: { 'content-type': 'application/zip' }, body: file },
+    );
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(e.error || `HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    typing.remove();
+    addMessage('bot', formatReply(data.reply || '(sem resposta)'));
+  } catch (e) {
+    typing.remove();
+    addMessage('bot', `❌ ${escapeHtml(e.message)}`);
+  }
+}
+
+// Injeta o botão de upload (📎) ao lado do "Enviar".
+function setupUpload() {
+  const form = $('#assistant-form');
+  if (!form || form.querySelector('.upload-btn')) return;
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.zip,application/zip';
+  input.hidden = true;
+  document.body.appendChild(input);
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'btn upload-btn';
+  btn.title = 'Enviar um .zip do código para o Claude analisar';
+  btn.textContent = '📎 Zip';
+  const submit = form.querySelector('button[type="submit"]');
+  form.insertBefore(btn, submit || null);
+  btn.addEventListener('click', () => input.click());
+  input.addEventListener('change', () => {
+    if (input.files && input.files[0]) uploadZip(input.files[0]);
+    input.value = '';
+  });
+}
+
 async function sendCommand(text) {
   if (!text.trim()) return;
   addMessage('user', escapeHtml(text));
@@ -349,6 +398,10 @@ function init() {
   $('#suggestions').querySelectorAll('button').forEach((btn) => {
     btn.addEventListener('click', () => sendChat(btn.dataset.cmd));
   });
+  setupUpload(); // botão 📎 de upload de .zip do código
+  // Esconde o toggle do Strix (a conversa não usa) — imediatamente.
+  const dm0 = document.querySelector('.deep-mode');
+  if (dm0) dm0.hidden = true;
   // Toggle de modo profundo (legado do Strix) — guardado caso exista.
   const deepToggle = $('#deep-toggle');
   if (deepToggle) {

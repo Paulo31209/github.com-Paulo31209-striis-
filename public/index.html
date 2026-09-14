@@ -14,77 +14,108 @@
   </head>
   <body>
     <header class="topbar">
-      <div class="brand">
-        <span class="logo">🛡️</span>
-        <div>
-          <h1>STRIIS</h1>
-          <p class="tagline">Agente de cibersegurança — monitorando falhas em tempo real</p>
+      <div class="topbar-inner">
+        <div class="brand">
+          <span class="logo">🛡️</span>
+          <div class="brand-text">
+            <h1>STRIIS</h1>
+            <p class="tagline">Analista de segurança com IA — sites, repositórios Git e código</p>
+          </div>
         </div>
-      </div>
-      <div class="topbar-right">
-        <span class="engine-badge" id="engine-badge" title="Estado do engine Strix">verificando engine…</span>
-        <div class="status" id="status">
-          <span class="dot"></span> conectando…
+        <div class="topbar-right">
+          <span class="engine-badge" id="engine-badge" title="Estado do engine">verificando engine…</span>
+          <div class="status" id="status">
+            <span class="dot"></span> conectando…
+          </div>
         </div>
       </div>
     </header>
 
     <main>
-      <!-- Caixa de comando em linguagem natural -->
+      <!-- Conversa com o analista — o centro da experiência -->
       <section class="assistant">
-        <div class="assistant-log" id="assistant-log">
-          <div class="msg bot">
-            Me diga um alvo pra eu analisar, ex.:
-            <em>"analise a segurança do exemplo.com"</em>.
-            Eu gero o relatório e depois a gente aprofunda nos principais erros.
+        <div class="assistant-head">
+          <span class="assistant-avatar">🤖</span>
+          <div class="assistant-id">
+            <h2>Analista de segurança</h2>
+            <p>Diga um site, cole um repositório Git ou envie um .zip (📎) do código. Recebe o relatório e aprofunda na conversa.</p>
           </div>
         </div>
+
+        <div class="assistant-log" id="assistant-log">
+          <div class="msg bot">
+            Me diga o que analisar: um site (<em>"analise a segurança do exemplo.com"</em>),
+            um repositório (<em>"revise github.com/usuario/projeto"</em>) ou clique em
+            <em>📎 Zip</em> para enviar o código. Eu gero o relatório e depois a gente
+            aprofunda nos principais erros.
+          </div>
+        </div>
+
         <form class="assistant-input" id="assistant-form">
           <input
             type="text"
             id="command-input"
-            placeholder="Ex.: faça uma varredura no meu sistema e encontre falhas"
+            placeholder="Ex.: analise a segurança do exemplo.com  —  ou cole um repo do GitHub"
             autocomplete="off"
           />
-          <button type="submit" class="btn primary">Enviar</button>
+          <button type="submit" class="btn primary send-btn">
+            <span>Enviar</span>
+            <span class="send-icon" aria-hidden="true">➤</span>
+          </button>
         </form>
+
         <div class="suggestions" id="suggestions">
           <button data-cmd="analise a segurança do giranet.com.br">🌐 Analisar um site</button>
           <button data-cmd="quais são os principais erros?">🔎 Principais erros</button>
           <button data-cmd="como eu corrijo esses problemas?">🛠️ Como corrigir</button>
           <button data-cmd="qual o risco mais grave e por quê?">⚠️ Risco mais grave</button>
         </div>
-        <label class="deep-mode">
-          <input type="checkbox" id="deep-toggle" disabled />
-          <span>🧠 Modo profundo (Strix AI) — pentest autônomo, mais lento e completo</span>
-        </label>
+
       </section>
 
       <!-- Cartões de resumo -->
       <section class="cards" id="summary-cards">
-        <div class="card risk">
-          <span class="card-label">Nível de risco</span>
+        <div class="card card-risk risk">
+          <div class="card-head">
+            <span class="card-icon">🎯</span>
+            <span class="card-label">Nível de risco</span>
+          </div>
           <span class="card-value" id="avg-risk">–</span>
           <div class="risk-bar"><div class="risk-fill" id="risk-fill"></div></div>
         </div>
         <div class="card">
-          <span class="card-label">Scans realizados</span>
+          <div class="card-head">
+            <span class="card-icon">🔍</span>
+            <span class="card-label">Scans realizados</span>
+          </div>
           <span class="card-value" id="total-scans">–</span>
         </div>
         <div class="card sev-critical">
-          <span class="card-label">Críticas</span>
+          <div class="card-head">
+            <span class="card-icon">🔴</span>
+            <span class="card-label">Críticas</span>
+          </div>
           <span class="card-value" id="count-critical">–</span>
         </div>
         <div class="card sev-high">
-          <span class="card-label">Altas</span>
+          <div class="card-head">
+            <span class="card-icon">🟠</span>
+            <span class="card-label">Altas</span>
+          </div>
           <span class="card-value" id="count-high">–</span>
         </div>
         <div class="card sev-medium">
-          <span class="card-label">Médias</span>
+          <div class="card-head">
+            <span class="card-icon">🟡</span>
+            <span class="card-label">Médias</span>
+          </div>
           <span class="card-value" id="count-medium">–</span>
         </div>
         <div class="card sev-low">
-          <span class="card-label">Baixas</span>
+          <div class="card-head">
+            <span class="card-icon">🔵</span>
+            <span class="card-label">Baixas</span>
+          </div>
           <span class="card-value" id="count-low">–</span>
         </div>
       </section>
@@ -92,28 +123,28 @@
       <div class="layout">
         <!-- Painel de execução de scans -->
         <section class="panel scan-runner">
-          <h2>Executar novo scan</h2>
+          <h2>⚡ Executar novo scan</h2>
 
           <div class="scan-form">
             <label>URL / site alvo</label>
             <div class="row">
               <input type="text" id="url-input" placeholder="ex.: exemplo.com" />
-              <button class="btn primary" data-scan="url">Escanear URL</button>
+              <button class="btn primary" data-scan="url">Escanear</button>
             </div>
           </div>
 
           <div class="scan-form">
             <label>Servidor onde o STRIIS roda</label>
             <div class="row">
-              <button class="btn" data-scan="server">Analisar servidor</button>
+              <button class="btn full" data-scan="server">🖥️ Analisar servidor</button>
             </div>
           </div>
 
           <div class="scan-form">
             <label>Dependências de um projeto</label>
             <div class="row">
-              <input type="text" id="deps-input" placeholder="caminho do projeto (vazio = projeto atual)" />
-              <button class="btn" data-scan="deps">Verificar CVEs</button>
+              <input type="text" id="deps-input" placeholder="caminho do projeto (vazio = atual)" />
+              <button class="btn" data-scan="deps">CVEs</button>
             </div>
           </div>
 
@@ -122,7 +153,7 @@
 
         <!-- Lista de scans -->
         <section class="panel scan-list">
-          <h2>Histórico de scans</h2>
+          <h2>🗂️ Histórico de scans</h2>
           <div id="scans-container" class="scans"></div>
         </section>
       </div>
@@ -131,7 +162,7 @@
       <section class="panel findings-panel" id="findings-panel" hidden>
         <div class="findings-header">
           <h2 id="findings-title">Detalhes do scan</h2>
-          <button class="btn ghost" id="close-findings">Fechar</button>
+          <button class="btn ghost" id="close-findings">✕ Fechar</button>
         </div>
         <div id="findings-container"></div>
       </section>

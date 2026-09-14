@@ -1,5 +1,10 @@
 // Rotas da API do STRIIS.
 import express from 'express';
+import fs from 'node:fs';
+import fsp from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { scanUrl } from '../scanners/urlScanner.js';
 import { scanServer } from '../scanners/serverScanner.js';
 import { scanDeps } from '../scanners/depScanner.js';
@@ -7,7 +12,7 @@ import { saveScan, getScan, listScans, summary } from '../lib/store.js';
 import { parseIntent, replyForScan, replyForIntent } from '../lib/intent.js';
 import { getEngineStatus, runStrixScan } from '../lib/strix.js';
 import { getClaudeStatus, runClaudeReview } from '../lib/claudeAgent.js';
-import { chat as claudeChat } from '../lib/claudeChat.js';
+import { chat as claudeChat, reviewCodeDir } from '../lib/claudeChat.js';
 import { createJob, jobView, appendLog, finishJob, failJob } from '../lib/jobs.js';
 
 export const api = express.Router();
@@ -16,6 +21,69 @@ export const api = express.Router();
 api.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'striis', time: new Date().toISOString() });
 });
+
+// Extrai um .zip para um diretório temporário (tenta unzip, depois python3).
+function unzipTo(zipPath, destDir) {
+  fs.mkdirSync(destDir, { recursive: true });
+  let r = spawnSync('unzip', ['-o', '-q', zipPath, '-d', destDir], { encoding: 'utf8', timeout: 60_000 });
+  if (!r.error && r.status === 0) return;
+  // fallback: python3
+  const py =
+    'import zipfile,sys; zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2])';
+  r = spawnSync('python3', ['-c', py, zipPath, destDir], { encoding: 'utf8', timeout: 60_000 });
+  if (!r.error && r.status === 0) return;
+  throw new Error('Falha ao descompactar o .zip (instale "unzip" ou python3).');
+}
+
+// Se o zip extrair para uma única pasta raiz, usa ela como diretório do projeto.
+function projectRoot(dir) {
+  try {
+    const entries = fs.readdirSync(dir, { withFileTypes: true }).filter((e) => !e.name.startsWith('__MACOSX'));
+    if (entries.length === 1 && entries[0].isDirectory()) return path.join(dir, entries[0].name);
+  } catch {
+    /* ignore */
+  }
+  return dir;
+}
+
+// Upload de um .zip com o código → revisão de segurança completa pelo Claude.
+// Corpo: bytes do .zip (application/zip). Query: conversationId, name.
+api.post(
+  '/chat/upload',
+  express.raw({ type: ['application/zip', 'application/octet-stream', 'application/x-zip-compressed'], limit: '80mb' }),
+  async (req, res) => {
+    const claude = getClaudeStatus();
+    if (!claude.available) {
+      return res.status(503).json({ error: `Claude indisponível. ${claude.reason}` });
+    }
+    const buf = req.body;
+    if (!buf || !buf.length) return res.status(400).json({ error: 'Envie um arquivo .zip no corpo.' });
+
+    const conversationId = (req.query.conversationId || 'default').toString().slice(0, 100);
+    const label = (req.query.name || 'codigo.zip').toString().slice(0, 120);
+
+    const base = path.join(os.tmpdir(), 'striis-zip-' + Math.random().toString(36).slice(2, 10));
+    const zipPath = base + '.zip';
+    const extractDir = base;
+    try {
+      await fsp.writeFile(zipPath, buf);
+      unzipTo(zipPath, extractDir);
+      await fsp.rm(zipPath, { force: true }).catch(() => {});
+      const root = projectRoot(extractDir);
+      const result = await reviewCodeDir({
+        conversationId,
+        dir: root,
+        label,
+        cleanupDir: extractDir,
+      });
+      res.json(result);
+    } catch (err) {
+      await fsp.rm(extractDir, { recursive: true, force: true }).catch(() => {});
+      await fsp.rm(zipPath, { force: true }).catch(() => {});
+      res.status(500).json({ error: err.message });
+    }
+  },
+);
 
 // Conversa com o Claude local (analista de segurança, memória de 5 min).
 // Body: { message, conversationId? }
