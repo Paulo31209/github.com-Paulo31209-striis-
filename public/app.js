@@ -13,7 +13,8 @@ const SEV_LABEL = {
 const TYPE_LABEL = { url: 'URL', server: 'Servidor', deps: 'Deps', strix: 'Strix AI' };
 
 let engineAvailable = false; // Strix pronto no servidor?
-let deepMode = false; // usuário forçou modo profundo (Strix)?
+let deepMode = false; // usar modo profundo (Strix)?
+let deepInitialized = false; // já definiu o padrão do toggle?
 
 async function api(path, options) {
   const res = await fetch(`/api${path}`, options);
@@ -80,6 +81,12 @@ async function loadEngine() {
       badge.innerHTML = `🧠 Strix conectado${e.model ? ` · ${escapeHtml(e.model)}` : ''}`;
       badge.title = 'Engine de pentest com IA pronto no servidor.';
       toggle.disabled = false;
+      // Strix pronto → liga o modo profundo por padrão (só na 1ª vez).
+      if (!deepInitialized) {
+        toggle.checked = true;
+        deepMode = true;
+        deepInitialized = true;
+      }
     } else {
       badge.className = 'engine-badge off';
       badge.innerHTML = '⚡ Modo rápido (Strix off)';
