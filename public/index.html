@@ -15,8 +15,11 @@
           <p class="tagline">Agente de cibersegurança — monitorando falhas em tempo real</p>
         </div>
       </div>
-      <div class="status" id="status">
-        <span class="dot"></span> conectando…
+      <div class="topbar-right">
+        <span class="engine-badge" id="engine-badge" title="Estado do engine Strix">verificando engine…</span>
+        <div class="status" id="status">
+          <span class="dot"></span> conectando…
+        </div>
       </div>
     </header>
 
@@ -44,8 +47,12 @@
           <button data-cmd="Faça uma varredura no meu sistema e encontre falhas">🖥️ Varrer meu sistema</button>
           <button data-cmd="Escaneie o site github.com">🌐 Escanear um site</button>
           <button data-cmd="Procure CVEs nas dependências">📦 Checar dependências</button>
-          <button data-cmd="Faça uma varredura completa">🛡️ Varredura completa</button>
+          <button data-cmd="Faça um pentest no site exemplo.com">🧠 Pentest com IA (Strix)</button>
         </div>
+        <label class="deep-mode">
+          <input type="checkbox" id="deep-toggle" disabled />
+          <span>🧠 Modo profundo (Strix AI) — pentest autônomo, mais lento e completo</span>
+        </label>
       </section>
 
       <!-- Cartões de resumo -->

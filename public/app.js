@@ -10,7 +10,10 @@ const SEV_LABEL = {
   low: 'Baixa',
   info: 'Info',
 };
-const TYPE_LABEL = { url: 'URL', server: 'Servidor', deps: 'Deps' };
+const TYPE_LABEL = { url: 'URL', server: 'Servidor', deps: 'Deps', strix: 'Strix AI' };
+
+let engineAvailable = false; // Strix pronto no servidor?
+let deepMode = false; // usuário forçou modo profundo (Strix)?
 
 async function api(path, options) {
   const res = await fetch(`/api${path}`, options);
@@ -63,6 +66,33 @@ function setStatus(online) {
   const el = $('#status');
   el.className = `status ${online ? 'online' : 'offline'}`;
   el.innerHTML = `<span class="dot"></span> ${online ? 'STRIIS online' : 'sem conexão'}`;
+}
+
+// ----- Engine (Strix) -----
+async function loadEngine() {
+  const badge = $('#engine-badge');
+  const toggle = $('#deep-toggle');
+  try {
+    const e = await api('/engine');
+    engineAvailable = e.available;
+    if (e.available) {
+      badge.className = 'engine-badge on';
+      badge.innerHTML = `🧠 Strix conectado${e.model ? ` · ${escapeHtml(e.model)}` : ''}`;
+      badge.title = 'Engine de pentest com IA pronto no servidor.';
+      toggle.disabled = false;
+    } else {
+      badge.className = 'engine-badge off';
+      badge.innerHTML = '⚡ Modo rápido (Strix off)';
+      badge.title = e.reason || 'Strix não configurado.';
+      // Sem Strix, o toggle fica desabilitado mas explica como ligar.
+      toggle.disabled = true;
+      deepMode = false;
+      $('#deep-toggle').checked = false;
+    }
+  } catch {
+    badge.className = 'engine-badge off';
+    badge.innerHTML = '⚡ Modo rápido';
+  }
 }
 
 // ----- Lista de scans -----
@@ -200,10 +230,16 @@ async function sendCommand(text) {
     const data = await api('/command', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text, engine: deepMode ? 'strix' : 'builtin' }),
     });
     typing.remove();
     addMessage('bot', formatReply(data.reply));
+
+    // Scan do Strix roda em background → acompanha o job ao vivo.
+    if (data.job) {
+      await pollJob(data.job.id);
+      return;
+    }
 
     // Atualiza painel e histórico; abre os detalhes do primeiro scan.
     await Promise.all([loadSummary(), loadScans()]);
@@ -213,6 +249,44 @@ async function sendCommand(text) {
   } catch (e) {
     typing.remove();
     addMessage('bot', `❌ Deu erro ao processar: ${escapeHtml(e.message)}`);
+  }
+}
+
+// Acompanha um job assíncrono (Strix), mostrando o log ao vivo.
+async function pollJob(jobId) {
+  const logBox = addMessage('bot terminal', '<div class="term-line">⏳ Iniciando engine Strix…</div>');
+  logBox.classList.add('terminal');
+  let since = 0;
+
+  while (true) {
+    let job;
+    try {
+      job = await api(`/jobs/${jobId}?since=${since}`);
+    } catch (e) {
+      logBox.innerHTML += `<div class="term-line err">erro ao consultar job: ${escapeHtml(e.message)}</div>`;
+      return;
+    }
+
+    for (const line of job.log) {
+      const div = document.createElement('div');
+      div.className = 'term-line';
+      div.textContent = line;
+      logBox.appendChild(div);
+    }
+    since = job.logTotal;
+    $('#assistant-log').scrollTop = $('#assistant-log').scrollHeight;
+
+    if (job.status === 'done') {
+      await Promise.all([loadSummary(), loadScans()]);
+      addMessage('bot', '✅ Pentest concluído! Abri os resultados abaixo. 👇');
+      if (job.scanId) showFindings(job.scanId);
+      return;
+    }
+    if (job.status === 'error') {
+      addMessage('bot', `❌ O Strix falhou: ${escapeHtml(job.error || 'erro desconhecido')}`);
+      return;
+    }
+    await new Promise((r) => setTimeout(r, 2000));
   }
 }
 
@@ -242,12 +316,18 @@ function init() {
   $('#suggestions').querySelectorAll('button').forEach((btn) => {
     btn.addEventListener('click', () => sendCommand(btn.dataset.cmd));
   });
+  // Toggle de modo profundo (Strix).
+  $('#deep-toggle').addEventListener('change', (e) => {
+    deepMode = e.target.checked;
+  });
   $('#footer-time').textContent = new Date().toLocaleString('pt-BR');
 
+  loadEngine();
   loadSummary();
   loadScans();
   // Atualiza o resumo a cada 30s.
   setInterval(loadSummary, 30_000);
+  setInterval(loadEngine, 30_000);
 }
 
 document.addEventListener('DOMContentLoaded', init);

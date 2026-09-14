@@ -18,7 +18,27 @@ const KW = {
   all: /(tudo|completa?|completo|geral|full|todas?\s+as?\s+(falhas|verifica)|varredura\s+geral)/i,
   scanVerb:
     /(varredur|escane|escanei|escanea|verific|analis|checar|checa|procur|encontr|busca|aud[íi]t|pentest|teste?\s+de\s+seguran|falhas?|vulnerab|invas)/i,
+  // Sinaliza que o usuário quer o pentest profundo com IA (engine Strix).
+  deep: /(pentest|penetra|profund|invas|explor|\bpoc\b|prova\s+de\s+conceito|\bstrix\b|hackear|atacar|exploit|ataque)/i,
 };
+
+// URL completa (com esquema) ou repositório git.
+const FULL_URL_REGEX = /\bhttps?:\/\/[^\s]+/i;
+const GIT_SSH_REGEX = /\bgit@[^\s:]+:[^\s]+\.git\b/i;
+const IP_REGEX = /\b(?:\d{1,3}\.){3}\d{1,3}\b/;
+
+// Extrai o melhor alvo do texto: URL completa > git > IP > domínio.
+function extractTarget(raw) {
+  const full = raw.match(FULL_URL_REGEX);
+  if (full) return full[0];
+  const git = raw.match(GIT_SSH_REGEX);
+  if (git) return git[0];
+  const ip = raw.match(IP_REGEX);
+  if (ip) return ip[0];
+  const dom = raw.match(URL_REGEX);
+  if (dom && !NOT_A_DOMAIN.test(dom[1])) return dom[1];
+  return null;
+}
 
 /**
  * Interpreta o texto e retorna a intenção.
@@ -30,14 +50,19 @@ export function parseIntent(text) {
 
   if (!raw) return { type: 'unknown', matched: 'vazio' };
 
+  const deep = KW.deep.test(t);
+  const target = extractTarget(raw);
+
+  // 0) Pentest profundo (engine Strix): pediu explicitamente e tem alvo.
+  if (deep) {
+    return { type: 'strix', deep: true, target, matched: 'pentest profundo (Strix)' };
+  }
+
   // 1) Domínio/URL explícito tem prioridade (alvo concreto).
-  const urlMatch = raw.match(URL_REGEX);
-  if (urlMatch && !NOT_A_DOMAIN.test(urlMatch[1])) {
+  if (target && (KW.scanVerb.test(t) || KW.url.test(t))) {
     // Só trata como scan de URL se houver verbo de scan OU palavra de site,
     // para não disparar à toa quando o domínio aparece por acaso.
-    if (KW.scanVerb.test(t) || KW.url.test(t)) {
-      return { type: 'url', target: urlMatch[1], matched: `domínio detectado: ${urlMatch[1]}` };
-    }
+    return { type: 'url', target, matched: `alvo detectado: ${target}` };
   }
 
   // 2) Varredura completa/geral → roda todos.

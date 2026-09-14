@@ -5,6 +5,8 @@ import { scanServer } from '../scanners/serverScanner.js';
 import { scanDeps } from '../scanners/depScanner.js';
 import { saveScan, getScan, listScans, summary } from '../lib/store.js';
 import { parseIntent, replyForScan, replyForIntent } from '../lib/intent.js';
+import { getEngineStatus, runStrixScan } from '../lib/strix.js';
+import { createJob, jobView, appendLog, finishJob, failJob } from '../lib/jobs.js';
 
 export const api = express.Router();
 
@@ -16,6 +18,36 @@ api.get('/health', (req, res) => {
 // Resumo agregado para o dashboard.
 api.get('/summary', (req, res) => {
   res.json(summary());
+});
+
+// Status do engine Strix (instalado? docker? LLM configurado?).
+api.get('/engine', (req, res) => {
+  res.json(getEngineStatus());
+});
+
+// Inicia um scan do Strix (assíncrono). Retorna um jobId para polling.
+// Body: { target, mode?, instruction? }
+api.post('/scans/strix', (req, res) => {
+  const target = (req.body?.target || '').trim();
+  if (!target) return res.status(400).json({ error: 'Informe o campo "target".' });
+
+  const engine = getEngineStatus();
+  if (!engine.available) {
+    return res.status(503).json({ error: `Strix indisponível. ${engine.reason}`, engine });
+  }
+
+  const mode = (req.body?.mode || '').trim() || undefined;
+  const instruction = (req.body?.instruction || '').trim() || undefined;
+  const job = startStrixJob({ target, mode, instruction });
+  res.status(202).json(jobView(job.id));
+});
+
+// Polling de um job. ?since=N devolve só as linhas de log a partir de N.
+api.get('/jobs/:id', (req, res) => {
+  const since = parseInt(req.query.since, 10) || 0;
+  const view = jobView(req.params.id, since);
+  if (!view) return res.status(404).json({ error: 'Job não encontrado.' });
+  res.json(view);
 });
 
 // Lista todos os scans (sem os findings completos, para leveza).
@@ -84,13 +116,85 @@ async function executeScan(type) {
   return saveScan({ type, target: cfg.target, findings, startedAt, finishedAt });
 }
 
+// Inicia um job de scan Strix em background e devolve o registro do job.
+function startStrixJob({ target, mode, instruction }) {
+  const job = createJob({ type: 'strix', target });
+  const startedAt = new Date().toISOString();
+
+  // Executa em background; o front acompanha via /api/jobs/:id.
+  (async () => {
+    try {
+      const result = await runStrixScan({
+        target,
+        scanMode: mode,
+        instruction,
+        onLog: (line) => appendLog(job.id, line),
+      });
+      const finishedAt = new Date().toISOString();
+      const scan = saveScan({
+        type: 'strix',
+        target,
+        findings: result.findings,
+        startedAt,
+        finishedAt,
+      });
+      scan.runName = result.runName;
+      scan.reportPath = result.reportPath;
+      appendLog(job.id, `✅ Scan concluído: ${result.findings.length} achado(s).`);
+      finishJob(job.id, { scanId: scan.id, runName: result.runName });
+    } catch (err) {
+      appendLog(job.id, `❌ Erro: ${err.message}`);
+      failJob(job.id, err);
+    }
+  })();
+
+  return job;
+}
+
 // Comando em linguagem natural: interpreta a intenção e roda o(s) scan(s).
-// Body: { text: "faça uma varredura no meu sistema e encontre falhas" }
+// Body: { text: "faça uma varredura no meu sistema e encontre falhas", engine?: "strix"|"builtin" }
 api.post('/command', async (req, res) => {
   const text = (req.body?.text || '').trim();
   if (!text) return res.status(400).json({ error: 'Informe o campo "text".' });
 
   const intent = parseIntent(text);
+
+  // Modo profundo (Strix): usuário pediu explicitamente OU o front está em modo Strix.
+  const wantsStrix =
+    req.body?.engine === 'strix' || intent.deep === true;
+
+  if (wantsStrix) {
+    const engine = getEngineStatus();
+    // Strix precisa de um alvo concreto (URL, repo, diretório, IP).
+    if (!intent.target) {
+      return res.json({
+        intent,
+        reply:
+          '🧠 Modo Strix (pentest com IA) precisa de um alvo específico. ' +
+          'Diga o que escanear, ex.: *"pentest no site exemplo.com"* ou ' +
+          '*"analise o repo https://github.com/user/repo"*.',
+        scans: [],
+      });
+    }
+    if (!engine.available) {
+      return res.json({
+        intent,
+        reply:
+          `⚠️ O engine **Strix** ainda não está pronto no servidor. ${engine.reason}\n\n` +
+          'Enquanto isso, posso rodar a varredura rápida (built-in). ' +
+          'Veja o guia de instalação no README para ativar o Strix.',
+        engine,
+        scans: [],
+      });
+    }
+    const job = startStrixJob({ target: intent.target, instruction: text });
+    return res.json({
+      intent,
+      reply: `🧠 Iniciei um **pentest com IA (Strix)** em **${intent.target}**. Isso pode levar alguns minutos — vou te mostrando o progresso aqui. 👇`,
+      job: jobView(job.id),
+      scans: [],
+    });
+  }
 
   // Casos sem alvo/intenção clara: responde pedindo mais informação.
   if (intent.type === 'unknown' || intent.type === 'need_url') {
