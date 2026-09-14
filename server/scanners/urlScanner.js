@@ -54,23 +54,45 @@ function normalizeUrl(input) {
   return new URL(url);
 }
 
-function request(url) {
+function request(url, redirectsLeft = 5) {
   return new Promise((resolve, reject) => {
     const client = url.protocol === 'https:' ? https : http;
-    const req = client.request(
-      url,
-      { method: 'GET', timeout: 10_000, rejectUnauthorized: false },
-      (res) => {
-        // Não precisamos do corpo; só headers e conexão TLS.
-        const tlsInfo =
-          url.protocol === 'https:' && res.socket.getPeerCertificate
-            ? res.socket.getPeerCertificate()
-            : null;
-        res.resume(); // descarta o corpo
-        resolve({ statusCode: res.statusCode, headers: res.headers, tlsInfo });
+    const options = {
+      method: 'GET',
+      timeout: 15_000,
+      rejectUnauthorized: false,
+      // Força IPv4: alguns servidores têm rota IPv6 quebrada que trava a conexão
+      // (o curl usa IPv4 e funciona; o Node tentaria IPv6 e daria timeout).
+      family: 4,
+      headers: {
+        'User-Agent': 'STRIIS-Scanner/0.1 (+seguranca)',
+        Accept: '*/*',
       },
-    );
-    req.on('timeout', () => req.destroy(new Error('Tempo esgotado ao conectar.')));
+    };
+    const req = client.request(url, options, (res) => {
+      const status = res.statusCode;
+
+      // Segue redirecionamentos (http→https, apex→www, etc.).
+      if (status >= 300 && status < 400 && res.headers.location && redirectsLeft > 0) {
+        res.resume();
+        let next;
+        try {
+          next = new URL(res.headers.location, url);
+        } catch {
+          return resolve({ statusCode: status, headers: res.headers, tlsInfo: null, finalUrl: url });
+        }
+        return resolve(request(next, redirectsLeft - 1));
+      }
+
+      // Não precisamos do corpo; só headers e conexão TLS.
+      const tlsInfo =
+        url.protocol === 'https:' && res.socket.getPeerCertificate
+          ? res.socket.getPeerCertificate()
+          : null;
+      res.resume(); // descarta o corpo
+      resolve({ statusCode: status, headers: res.headers, tlsInfo, finalUrl: url });
+    });
+    req.on('timeout', () => req.destroy(new Error('Tempo esgotado ao conectar (15s).')));
     req.on('error', reject);
     req.end();
   });
