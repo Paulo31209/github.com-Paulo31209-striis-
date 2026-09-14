@@ -69,37 +69,29 @@ function setStatus(online) {
   el.innerHTML = `<span class="dot"></span> ${online ? 'STRIIS online' : 'sem conexão'}`;
 }
 
-// ----- Engine (Strix) -----
+// ----- Engine (badge do topo mostra o Claude, engine principal da conversa) -----
 async function loadEngine() {
   const badge = $('#engine-badge');
-  const toggle = $('#deep-toggle');
   try {
     const e = await api('/engine');
-    engineAvailable = e.available;
-    if (e.available) {
+    const claudeOn = !!(e.claude && e.claude.available);
+    engineAvailable = claudeOn;
+    if (claudeOn) {
       badge.className = 'engine-badge on';
-      badge.innerHTML = `🧠 Strix conectado${e.model ? ` · ${escapeHtml(e.model)}` : ''}`;
-      badge.title = 'Engine de pentest com IA pronto no servidor.';
-      toggle.disabled = false;
-      // Strix pronto → liga o modo profundo por padrão (só na 1ª vez).
-      if (!deepInitialized) {
-        toggle.checked = true;
-        deepMode = true;
-        deepInitialized = true;
-      }
+      badge.innerHTML = '🤖 Claude conectado';
+      badge.title = 'Analista de segurança rodando no seu Claude do servidor.';
     } else {
       badge.className = 'engine-badge off';
-      badge.innerHTML = '⚡ Modo rápido (Strix off)';
-      badge.title = e.reason || 'Strix não configurado.';
-      // Sem Strix, o toggle fica desabilitado mas explica como ligar.
-      toggle.disabled = true;
-      deepMode = false;
-      $('#deep-toggle').checked = false;
+      badge.innerHTML = '⚠️ Claude off';
+      badge.title = (e.claude && e.claude.reason) || 'Claude local indisponível.';
     }
   } catch {
     badge.className = 'engine-badge off';
-    badge.innerHTML = '⚡ Modo rápido';
+    badge.innerHTML = '⚠️ sem conexão';
   }
+  // O toggle de "modo profundo" era do Strix; na conversa não se aplica.
+  const dm = document.querySelector('.deep-mode');
+  if (dm) dm.hidden = true;
 }
 
 // ----- Lista de scans -----
@@ -227,6 +219,40 @@ function formatReply(text) {
     .replace(/\n/g, '<br>');
 }
 
+// Identificador de conversa (memória de 5 min no servidor), por navegador.
+let conversationId = 'default';
+try {
+  conversationId =
+    localStorage.getItem('striis_convo') ||
+    (self.crypto?.randomUUID ? self.crypto.randomUUID() : 'c' + Date.now());
+  localStorage.setItem('striis_convo', conversationId);
+} catch {
+  conversationId = 'c' + Date.now();
+}
+
+// Conversa com o analista (Claude local). 1ª msg gera o relatório; depois aprofunda.
+async function sendChat(text) {
+  if (!text.trim()) return;
+  addMessage('user', escapeHtml(text));
+  $('#command-input').value = '';
+  const typing = addMessage('bot typing', '💭 analisando…');
+  try {
+    const data = await api('/chat', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ message: text, conversationId }),
+    });
+    typing.remove();
+    if (data.reset) {
+      addMessage('bot muted', '🕔 (nova sessão — a memória anterior expirou após 5 min)');
+    }
+    addMessage('bot', formatReply(data.reply || '(sem resposta)'));
+  } catch (e) {
+    typing.remove();
+    addMessage('bot', `❌ ${escapeHtml(e.message)}`);
+  }
+}
+
 async function sendCommand(text) {
   if (!text.trim()) return;
   addMessage('user', escapeHtml(text));
@@ -261,7 +287,7 @@ async function sendCommand(text) {
 
 // Acompanha um job assíncrono (Strix), mostrando o log ao vivo.
 async function pollJob(jobId) {
-  const logBox = addMessage('bot terminal', '<div class="term-line">⏳ Iniciando engine Strix…</div>');
+  const logBox = addMessage('bot terminal', '<div class="term-line">⏳ Iniciando…</div>');
   logBox.classList.add('terminal');
   let since = 0;
 
@@ -315,18 +341,21 @@ function init() {
     if (e.key === 'Enter') runScan('url');
   });
 
-  // Assistente em linguagem natural.
+  // Conversa com o analista (Claude local).
   $('#assistant-form').addEventListener('submit', (e) => {
     e.preventDefault();
-    sendCommand($('#command-input').value);
+    sendChat($('#command-input').value);
   });
   $('#suggestions').querySelectorAll('button').forEach((btn) => {
-    btn.addEventListener('click', () => sendCommand(btn.dataset.cmd));
+    btn.addEventListener('click', () => sendChat(btn.dataset.cmd));
   });
-  // Toggle de modo profundo (Strix).
-  $('#deep-toggle').addEventListener('change', (e) => {
-    deepMode = e.target.checked;
-  });
+  // Toggle de modo profundo (legado do Strix) — guardado caso exista.
+  const deepToggle = $('#deep-toggle');
+  if (deepToggle) {
+    deepToggle.addEventListener('change', (e) => {
+      deepMode = e.target.checked;
+    });
+  }
   $('#footer-time').textContent = new Date().toLocaleString('pt-BR');
 
   loadEngine();

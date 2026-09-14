@@ -175,6 +175,7 @@ export async function runClaudeReview({ target, onLog } = {}) {
       });
       let out = '';
       let err = '';
+      child.stdin.end(); // evita o aviso "no stdin data received in 3s"
       child.stdout.on('data', (d) => (out += d));
       child.stderr.on('data', (d) => {
         err += d;

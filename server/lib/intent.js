@@ -28,7 +28,7 @@ const GIT_SSH_REGEX = /\bgit@[^\s:]+:[^\s]+\.git\b/i;
 const IP_REGEX = /\b(?:\d{1,3}\.){3}\d{1,3}\b/;
 
 // Extrai o melhor alvo do texto: URL completa > git > IP > domínio.
-function extractTarget(raw) {
+export function extractTarget(raw) {
   const full = raw.match(FULL_URL_REGEX);
   if (full) return full[0];
   const git = raw.match(GIT_SSH_REGEX);

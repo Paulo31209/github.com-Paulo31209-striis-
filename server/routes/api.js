@@ -7,6 +7,7 @@ import { saveScan, getScan, listScans, summary } from '../lib/store.js';
 import { parseIntent, replyForScan, replyForIntent } from '../lib/intent.js';
 import { getEngineStatus, runStrixScan } from '../lib/strix.js';
 import { getClaudeStatus, runClaudeReview } from '../lib/claudeAgent.js';
+import { chat as claudeChat } from '../lib/claudeChat.js';
 import { createJob, jobView, appendLog, finishJob, failJob } from '../lib/jobs.js';
 
 export const api = express.Router();
@@ -14,6 +15,25 @@ export const api = express.Router();
 // Health check.
 api.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'striis', time: new Date().toISOString() });
+});
+
+// Conversa com o Claude local (analista de segurança, memória de 5 min).
+// Body: { message, conversationId? }
+api.post('/chat', async (req, res) => {
+  const message = (req.body?.message || '').trim();
+  if (!message) return res.status(400).json({ error: 'Informe o campo "message".' });
+  const conversationId = (req.body?.conversationId || 'default').toString().slice(0, 100);
+
+  const claude = getClaudeStatus();
+  if (!claude.available) {
+    return res.status(503).json({ error: `Claude indisponível. ${claude.reason}`, claude });
+  }
+  try {
+    const result = await claudeChat({ conversationId, message });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Resumo agregado para o dashboard.

@@ -151,6 +151,7 @@ main { padding: 24px 28px 40px; max-width: 1200px; margin: 0 auto; }
   font-weight: 700;
 }
 .msg.typing { color: var(--text-dim); font-style: italic; background: var(--bg-pattern); border-color: var(--border); }
+.msg.muted { background: transparent; border: none; color: var(--text-dim); font-size: 12px; font-style: italic; align-self: center; padding: 2px 8px; }
 
 .assistant-input { display: flex; gap: 10px; }
 .assistant-input input {
