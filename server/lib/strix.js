@@ -191,17 +191,34 @@ export async function runStrixScan({ target, scanMode, instruction, onLog, signa
   }
 
   if (findings.length === 0) {
-    findings.push(
-      finding({
-        severity: SEVERITY.INFO,
-        title: 'Nenhuma vulnerabilidade confirmada pelo Strix',
-        detail:
-          'O Strix concluiu o scan sem confirmar vulnerabilidades (com PoC). ' +
-          'Veja o relatório completo para detalhes da cobertura.',
-        recommendation: 'Rode em modo "deep" para uma análise mais profunda.',
-        evidence: `run: ${runName}`,
-      }),
-    );
+    if (code !== 0) {
+      // O Strix encerrou com erro antes de gerar resultados — não é "limpo".
+      findings.push(
+        finding({
+          severity: SEVERITY.INFO,
+          title: 'Scan do Strix não concluído (erro)',
+          detail:
+            'O Strix encerrou com erro antes de confirmar vulnerabilidades. ' +
+            'Causas comuns: limite de contexto do modelo local, timeout do LLM ou ' +
+            'falha de conexão. Veja o log acima para o motivo exato.',
+          recommendation:
+            'Ajuste o modelo/contexto (ex.: aumentar num_ctx no Ollama) e rode novamente.',
+          evidence: `exit code ${code} · run ${runName}`,
+        }),
+      );
+    } else {
+      findings.push(
+        finding({
+          severity: SEVERITY.INFO,
+          title: 'Nenhuma vulnerabilidade confirmada pelo Strix',
+          detail:
+            'O Strix concluiu o scan sem confirmar vulnerabilidades (com PoC). ' +
+            'Veja o relatório completo para detalhes da cobertura.',
+          recommendation: 'Rode em modo "deep" para uma análise mais profunda.',
+          evidence: `run: ${runName}`,
+        }),
+      );
+    }
   }
 
   const reportPath = path.join(runDir, 'penetration_test_report.md');
