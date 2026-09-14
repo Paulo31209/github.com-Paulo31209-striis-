@@ -93,6 +93,13 @@ function detectTarget(msg) {
   return null;
 }
 
+// True se a mensagem aponta para código (repo Git ou caminho local) — análise
+// demorada que deve rodar em background (senão estoura o timeout da Cloudflare).
+export function looksLikeCode(message) {
+  const d = detectTarget(String(message || ''));
+  return Boolean(d && (d.kind === 'git' || d.kind === 'path'));
+}
+
 // ---------- Recon de URL ----------
 function normalizeUrl(input) {
   let u = String(input || '').trim();

@@ -16,6 +16,7 @@ export function createJob({ type, target }) {
     log: [],
     scanId: null,
     runName: null,
+    result: null, // resultado livre (ex.: { reply } da conversa/upload)
     error: null,
     startedAt: new Date().toISOString(),
     finishedAt: null,
@@ -34,12 +35,13 @@ export function appendLog(id, line) {
   if (job.log.length > MAX_LOG_LINES) job.log.splice(0, job.log.length - MAX_LOG_LINES);
 }
 
-export function finishJob(id, { scanId, runName }) {
+export function finishJob(id, { scanId, runName, result } = {}) {
   const job = jobs.get(id);
   if (!job) return;
   job.status = 'done';
-  job.scanId = scanId;
-  job.runName = runName;
+  if (scanId !== undefined) job.scanId = scanId;
+  if (runName !== undefined) job.runName = runName;
+  if (result !== undefined) job.result = result;
   job.finishedAt = new Date().toISOString();
 }
 
@@ -62,6 +64,7 @@ export function jobView(id, since = 0) {
     status: job.status,
     scanId: job.scanId,
     runName: job.runName,
+    result: job.result,
     error: job.error,
     startedAt: job.startedAt,
     finishedAt: job.finishedAt,

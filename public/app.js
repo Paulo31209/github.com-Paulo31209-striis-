@@ -242,6 +242,11 @@ async function sendChat(text) {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ message: text, conversationId }),
     });
+    // Análise de código/repo roda em background → acompanha o job.
+    if (data.job) {
+      await pollChatResult(data.job.id, typing);
+      return;
+    }
     typing.remove();
     if (data.reset) {
       addMessage('bot muted', '🕔 (nova sessão — a memória anterior expirou após 5 min)');
@@ -250,6 +255,36 @@ async function sendChat(text) {
   } catch (e) {
     typing.remove();
     addMessage('bot', `❌ ${escapeHtml(e.message)}`);
+  }
+}
+
+// Acompanha um job de conversa/upload (análise demorada em background).
+async function pollChatResult(jobId, typingEl) {
+  while (true) {
+    let job;
+    try {
+      job = await api(`/jobs/${jobId}`);
+    } catch (e) {
+      if (typingEl) typingEl.remove();
+      addMessage('bot', `❌ ${escapeHtml(e.message)}`);
+      return;
+    }
+    if (job.status === 'done') {
+      if (typingEl) typingEl.remove();
+      addMessage('bot', formatReply((job.result && job.result.reply) || '(sem resposta)'));
+      await Promise.all([loadSummary(), loadScans()]).catch(() => {});
+      return;
+    }
+    if (job.status === 'error') {
+      if (typingEl) typingEl.remove();
+      addMessage('bot', `❌ ${escapeHtml(job.error || 'erro na análise')}`);
+      return;
+    }
+    // Mostra a última linha de progresso no balão de "digitando".
+    if (typingEl && job.log && job.log.length) {
+      typingEl.textContent = job.log[job.log.length - 1];
+    }
+    await new Promise((r) => setTimeout(r, 3000));
   }
 }
 
@@ -271,6 +306,10 @@ async function uploadZip(file) {
       throw new Error(e.error || `HTTP ${res.status}`);
     }
     const data = await res.json();
+    if (data.job) {
+      await pollChatResult(data.job.id, typing);
+      return;
+    }
     typing.remove();
     addMessage('bot', formatReply(data.reply || '(sem resposta)'));
   } catch (e) {

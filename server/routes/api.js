@@ -12,7 +12,7 @@ import { saveScan, getScan, listScans, summary } from '../lib/store.js';
 import { parseIntent, replyForScan, replyForIntent } from '../lib/intent.js';
 import { getEngineStatus, runStrixScan } from '../lib/strix.js';
 import { getClaudeStatus, runClaudeReview } from '../lib/claudeAgent.js';
-import { chat as claudeChat, reviewCodeDir } from '../lib/claudeChat.js';
+import { chat as claudeChat, reviewCodeDir, looksLikeCode } from '../lib/claudeChat.js';
 import { createJob, jobView, appendLog, finishJob, failJob } from '../lib/jobs.js';
 
 export const api = express.Router();
@@ -46,47 +46,70 @@ function projectRoot(dir) {
   return dir;
 }
 
-// Upload de um .zip com o código → revisão de segurança completa pelo Claude.
-// Corpo: bytes do .zip (application/zip). Query: conversationId, name.
+// Job em background: análise de conversa (usado quando o alvo é código/repo,
+// que demora e estouraria o timeout de 100s da Cloudflare).
+function startChatJob({ conversationId, message }) {
+  const job = createJob({ type: 'chat', target: message.slice(0, 80) });
+  (async () => {
+    try {
+      appendLog(job.id, '🔎 Analisando…');
+      const result = await claudeChat({ conversationId, message });
+      finishJob(job.id, { result: { reply: result.reply, target: result.target, kind: result.kind } });
+    } catch (err) {
+      appendLog(job.id, `❌ ${err.message}`);
+      failJob(job.id, err);
+    }
+  })();
+  return job;
+}
+
+// Job em background: recebe o .zip, extrai e revisa o código.
+function startUploadJob({ conversationId, buf, label }) {
+  const job = createJob({ type: 'upload', target: label });
+  (async () => {
+    const base = path.join(os.tmpdir(), 'striis-zip-' + Math.random().toString(36).slice(2, 10));
+    const zipPath = base + '.zip';
+    const extractDir = base;
+    try {
+      appendLog(job.id, '📦 Descompactando…');
+      await fsp.writeFile(zipPath, buf);
+      unzipTo(zipPath, extractDir);
+      await fsp.rm(zipPath, { force: true }).catch(() => {});
+      const root = projectRoot(extractDir);
+      appendLog(job.id, '🔎 Analisando o código com o Claude… (pode levar alguns minutos)');
+      const result = await reviewCodeDir({ conversationId, dir: root, label, cleanupDir: extractDir });
+      finishJob(job.id, { result: { reply: result.reply, target: result.target, kind: 'upload' } });
+    } catch (err) {
+      await fsp.rm(extractDir, { recursive: true, force: true }).catch(() => {});
+      await fsp.rm(zipPath, { force: true }).catch(() => {});
+      appendLog(job.id, `❌ ${err.message}`);
+      failJob(job.id, err);
+    }
+  })();
+  return job;
+}
+
+// Upload de um .zip com o código → revisão de segurança (assíncrona, via job).
 api.post(
   '/chat/upload',
   express.raw({ type: ['application/zip', 'application/octet-stream', 'application/x-zip-compressed'], limit: '80mb' }),
-  async (req, res) => {
+  (req, res) => {
     const claude = getClaudeStatus();
     if (!claude.available) {
       return res.status(503).json({ error: `Claude indisponível. ${claude.reason}` });
     }
     const buf = req.body;
     if (!buf || !buf.length) return res.status(400).json({ error: 'Envie um arquivo .zip no corpo.' });
-
     const conversationId = (req.query.conversationId || 'default').toString().slice(0, 100);
     const label = (req.query.name || 'codigo.zip').toString().slice(0, 120);
-
-    const base = path.join(os.tmpdir(), 'striis-zip-' + Math.random().toString(36).slice(2, 10));
-    const zipPath = base + '.zip';
-    const extractDir = base;
-    try {
-      await fsp.writeFile(zipPath, buf);
-      unzipTo(zipPath, extractDir);
-      await fsp.rm(zipPath, { force: true }).catch(() => {});
-      const root = projectRoot(extractDir);
-      const result = await reviewCodeDir({
-        conversationId,
-        dir: root,
-        label,
-        cleanupDir: extractDir,
-      });
-      res.json(result);
-    } catch (err) {
-      await fsp.rm(extractDir, { recursive: true, force: true }).catch(() => {});
-      await fsp.rm(zipPath, { force: true }).catch(() => {});
-      res.status(500).json({ error: err.message });
-    }
+    const job = startUploadJob({ conversationId, buf, label });
+    res.status(202).json({ job: jobView(job.id) });
   },
 );
 
 // Conversa com o Claude local (analista de segurança, memória de 5 min).
-// Body: { message, conversationId? }
+// Alvo de código (repo/caminho) roda em background e devolve { job } p/ polling.
+// Alvo de URL/geral responde na hora com { reply }.
 api.post('/chat', async (req, res) => {
   const message = (req.body?.message || '').trim();
   if (!message) return res.status(400).json({ error: 'Informe o campo "message".' });
@@ -97,6 +120,10 @@ api.post('/chat', async (req, res) => {
     return res.status(503).json({ error: `Claude indisponível. ${claude.reason}`, claude });
   }
   try {
+    if (looksLikeCode(message)) {
+      const job = startChatJob({ conversationId, message });
+      return res.status(202).json({ job: jobView(job.id) });
+    }
     const result = await claudeChat({ conversationId, message });
     res.json(result);
   } catch (err) {
