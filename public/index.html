@@ -21,6 +21,33 @@
     </header>
 
     <main>
+      <!-- Caixa de comando em linguagem natural -->
+      <section class="assistant">
+        <div class="assistant-log" id="assistant-log">
+          <div class="msg bot">
+            👋 Oi! Sou o STRIIS. Me diga o que quer verificar, tipo:
+            <em>"faça uma varredura no meu sistema e encontre falhas"</em>,
+            <em>"escaneie o site exemplo.com"</em> ou
+            <em>"procure CVEs nas dependências"</em>.
+          </div>
+        </div>
+        <form class="assistant-input" id="assistant-form">
+          <input
+            type="text"
+            id="command-input"
+            placeholder="Ex.: faça uma varredura no meu sistema e encontre falhas"
+            autocomplete="off"
+          />
+          <button type="submit" class="btn primary">Enviar</button>
+        </form>
+        <div class="suggestions" id="suggestions">
+          <button data-cmd="Faça uma varredura no meu sistema e encontre falhas">🖥️ Varrer meu sistema</button>
+          <button data-cmd="Escaneie o site github.com">🌐 Escanear um site</button>
+          <button data-cmd="Procure CVEs nas dependências">📦 Checar dependências</button>
+          <button data-cmd="Faça uma varredura completa">🛡️ Varredura completa</button>
+        </div>
+      </section>
+
       <!-- Cartões de resumo -->
       <section class="cards" id="summary-cards">
         <div class="card risk">

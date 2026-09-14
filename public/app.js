@@ -171,6 +171,51 @@ async function runScan(type) {
   }
 }
 
+// ----- Assistente (linguagem natural) -----
+function addMessage(role, html) {
+  const log = $('#assistant-log');
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+  div.innerHTML = html;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+  return div;
+}
+
+// Converte **negrito** e *itálico* simples em HTML (após escapar).
+function formatReply(text) {
+  return escapeHtml(text)
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/\n/g, '<br>');
+}
+
+async function sendCommand(text) {
+  if (!text.trim()) return;
+  addMessage('user', escapeHtml(text));
+  $('#command-input').value = '';
+  const typing = addMessage('bot typing', '🔎 Analisando…');
+
+  try {
+    const data = await api('/command', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+    typing.remove();
+    addMessage('bot', formatReply(data.reply));
+
+    // Atualiza painel e histórico; abre os detalhes do primeiro scan.
+    await Promise.all([loadSummary(), loadScans()]);
+    if (data.scans && data.scans.length) {
+      showFindings(data.scans[0].id);
+    }
+  } catch (e) {
+    typing.remove();
+    addMessage('bot', `❌ Deu erro ao processar: ${escapeHtml(e.message)}`);
+  }
+}
+
 function escapeHtml(str) {
   return String(str).replace(/[&<>"']/g, (c) =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]),
@@ -187,6 +232,15 @@ function init() {
   });
   $('#url-input').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') runScan('url');
+  });
+
+  // Assistente em linguagem natural.
+  $('#assistant-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    sendCommand($('#command-input').value);
+  });
+  $('#suggestions').querySelectorAll('button').forEach((btn) => {
+    btn.addEventListener('click', () => sendCommand(btn.dataset.cmd));
   });
   $('#footer-time').textContent = new Date().toLocaleString('pt-BR');
 
