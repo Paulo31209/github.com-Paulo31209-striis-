@@ -445,10 +445,10 @@ async function uploadZip(file) {
 function setupUpload() {
   const zone = document.getElementById('upload-zone');
   const input = document.getElementById('zip-input');
-  const cta = document.getElementById('upload-cta');
-  if (!input || !cta) return;
+  if (!input) return;
 
-  cta.addEventListener('click', () => input.click());
+  // O botão é um <label for="zip-input">, então o toque abre o seletor nativo
+  // (funciona no iOS). Aqui só tratamos a seleção e o arrastar-e-soltar.
   input.addEventListener('change', () => {
     if (input.files && input.files[0]) uploadZip(input.files[0]);
     input.value = '';

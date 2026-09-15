@@ -49,13 +49,18 @@
           </div>
         </div>
 
-        <!-- Ação principal: upload do .zip -->
+        <!-- Ação principal: upload do .zip (label nativo p/ funcionar no iOS) -->
         <div class="upload-zone" id="upload-zone">
-          <input type="file" id="zip-input" accept=".zip,application/zip" hidden />
-          <button type="button" class="btn primary upload-cta" id="upload-cta">
+          <input
+            type="file"
+            id="zip-input"
+            class="sr-file"
+            accept=".zip,application/zip,application/x-zip-compressed,application/octet-stream"
+          />
+          <label for="zip-input" class="btn primary upload-cta" id="upload-cta">
             📎 Enviar .zip do código
-          </button>
-          <p class="upload-hint">Arraste um .zip aqui ou clique para escolher — a análise roda no servidor.</p>
+          </label>
+          <p class="upload-hint">Toque para escolher o .zip (ou arraste aqui no computador) — a análise roda no servidor.</p>
           <label class="quick-mode">
             <input type="checkbox" id="quick-toggle" />
             <span>⚡ Modo rápido — foca nos arquivos críticos (~1–2 min). Desmarcado = análise completa.</span>
@@ -192,8 +197,15 @@
 
     <script src="app.js"></script>
     <script>
-      // Registra o service worker (PWA).
+      // Registra o service worker (PWA) e auto-recupera de cache antigo/quebrado:
+      // quando um SW novo assume o controle, recarrega 1x para pegar assets frescos.
       if ('serviceWorker' in navigator) {
+        let reloaded = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (reloaded) return;
+          reloaded = true;
+          location.reload();
+        });
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js').catch(() => {});
         });

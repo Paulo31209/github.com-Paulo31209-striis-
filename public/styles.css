@@ -557,10 +557,20 @@ footer {
   background: #fff3cc;
   transform: scale(1.01);
 }
+/* input de arquivo acessível mas invisível (não display:none — iOS precisa abrir o seletor) */
+.sr-file {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0);
+  white-space: nowrap; border: 0;
+}
 .upload-cta {
+  display: inline-block;
   font-size: 15.5px;
   padding: 14px 24px;
   border-radius: 14px;
+  cursor: pointer;
 }
 .upload-hint {
   margin: 12px 0 0;
