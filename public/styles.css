@@ -534,3 +534,37 @@ footer {
 @media (max-width: 380px) {
   .cards { grid-template-columns: 1fr 1fr; gap: 10px; }
 }
+
+/* ---------- Ferramenta focada no upload de .zip ---------- */
+/* Oculta os painéis antigos (scans/histórico/cards/detalhes). */
+#summary-cards,
+.layout,
+.findings-panel {
+  display: none !important;
+}
+
+.upload-zone {
+  border: 2px dashed var(--border-strong);
+  border-radius: 18px;
+  background: linear-gradient(180deg, var(--brand-soft), #fffdf6);
+  padding: 26px 20px;
+  text-align: center;
+  margin-bottom: 18px;
+  transition: border-color 0.15s, background 0.15s, transform 0.1s;
+}
+.upload-zone.dragover {
+  border-color: var(--brand-strong);
+  background: #fff3cc;
+  transform: scale(1.01);
+}
+.upload-cta {
+  font-size: 15.5px;
+  padding: 14px 24px;
+  border-radius: 14px;
+}
+.upload-hint {
+  margin: 12px 0 0;
+  font-size: 12.5px;
+  color: var(--text-dim);
+  font-weight: 600;
+}

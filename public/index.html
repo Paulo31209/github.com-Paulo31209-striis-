@@ -19,7 +19,7 @@
           <span class="logo">🛡️</span>
           <div class="brand-text">
             <h1>STRIIS</h1>
-            <p class="tagline">Analista de segurança com IA — sites, repositórios Git e código</p>
+            <p class="tagline">Analista de segurança com IA — envie o .zip do seu código</p>
           </div>
         </div>
         <div class="topbar-right">
@@ -38,15 +38,23 @@
           <span class="assistant-avatar">🤖</span>
           <div class="assistant-id">
             <h2>Analista de segurança</h2>
-            <p>Diga um site, cole um repositório Git ou envie um .zip (📎) do código. Recebe o relatório e aprofunda na conversa.</p>
+            <p>Envie um <strong>.zip</strong> do código da sua aplicação e receba o relatório de segurança. Depois, aprofunde na conversa.</p>
           </div>
+        </div>
+
+        <!-- Ação principal: upload do .zip -->
+        <div class="upload-zone" id="upload-zone">
+          <input type="file" id="zip-input" accept=".zip,application/zip" hidden />
+          <button type="button" class="btn primary upload-cta" id="upload-cta">
+            📎 Enviar .zip do código
+          </button>
+          <p class="upload-hint">Arraste um .zip aqui ou clique para escolher — a análise roda no servidor.</p>
         </div>
 
         <div class="assistant-log" id="assistant-log">
           <div class="msg bot">
-            Me diga o que analisar: um site (<em>"analise a segurança do exemplo.com"</em>),
-            um repositório (<em>"revise github.com/usuario/projeto"</em>) ou clique em
-            <em>📎 Zip</em> para enviar o código. Eu gero o relatório e depois a gente
+            Clique em <em>📎 Enviar .zip do código</em> (ou arraste o arquivo aqui) para eu
+            analisar a aplicação inteira. Eu gero o relatório com as falhas e depois a gente
             aprofunda nos principais erros.
           </div>
         </div>
@@ -55,7 +63,7 @@
           <input
             type="text"
             id="command-input"
-            placeholder="Ex.: analise a segurança do exemplo.com  —  ou cole um repo do GitHub"
+            placeholder="Depois do relatório, pergunte aqui: qual o principal erro?"
             autocomplete="off"
           />
           <button type="submit" class="btn primary send-btn">
@@ -65,7 +73,6 @@
         </form>
 
         <div class="suggestions" id="suggestions">
-          <button data-cmd="analise a segurança do giranet.com.br">🌐 Analisar um site</button>
           <button data-cmd="quais são os principais erros?">🔎 Principais erros</button>
           <button data-cmd="como eu corrijo esses problemas?">🛠️ Como corrigir</button>
           <button data-cmd="qual o risco mais grave e por quê?">⚠️ Risco mais grave</button>

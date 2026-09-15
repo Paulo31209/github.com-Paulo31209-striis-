@@ -318,27 +318,37 @@ async function uploadZip(file) {
   }
 }
 
-// Injeta o botão de upload (📎) ao lado do "Enviar".
+// Liga o botão/zona de upload de .zip (definidos no HTML) + arrastar-e-soltar.
 function setupUpload() {
-  const form = $('#assistant-form');
-  if (!form || form.querySelector('.upload-btn')) return;
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = '.zip,application/zip';
-  input.hidden = true;
-  document.body.appendChild(input);
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'btn upload-btn';
-  btn.title = 'Enviar um .zip do código para o Claude analisar';
-  btn.textContent = '📎 Zip';
-  const submit = form.querySelector('button[type="submit"]');
-  form.insertBefore(btn, submit || null);
-  btn.addEventListener('click', () => input.click());
+  const zone = document.getElementById('upload-zone');
+  const input = document.getElementById('zip-input');
+  const cta = document.getElementById('upload-cta');
+  if (!input || !cta) return;
+
+  cta.addEventListener('click', () => input.click());
   input.addEventListener('change', () => {
     if (input.files && input.files[0]) uploadZip(input.files[0]);
     input.value = '';
   });
+
+  if (zone) {
+    ['dragenter', 'dragover'].forEach((ev) =>
+      zone.addEventListener(ev, (e) => {
+        e.preventDefault();
+        zone.classList.add('dragover');
+      }),
+    );
+    ['dragleave', 'drop'].forEach((ev) =>
+      zone.addEventListener(ev, (e) => {
+        e.preventDefault();
+        zone.classList.remove('dragover');
+      }),
+    );
+    zone.addEventListener('drop', (e) => {
+      const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (f) uploadZip(f);
+    });
+  }
 }
 
 async function sendCommand(text) {
