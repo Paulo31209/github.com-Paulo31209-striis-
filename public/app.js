@@ -357,13 +357,23 @@ function addReport(reply, name) {
   $('#assistant-log').scrollTop = $('#assistant-log').scrollHeight;
 }
 
-// Acompanha o job de upload com barra de progresso animada + narração.
+// Acompanha o job de upload com barra de progresso animada + cronômetro.
 async function pollWithProgress(jobId, prog, name) {
+  const t0 = Date.now();
   let pct = 6;
+  let lastStatus = '⏳ Iniciando…';
+  const fmt = (ms) => {
+    const s = Math.floor(ms / 1000);
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  };
+  // Atualiza a cada segundo: barra sobe suave até ~97% e mostra o cronômetro.
   const anim = setInterval(() => {
-    pct += (93 - pct) * 0.045; // sobe suave até ~93% enquanto processa
-    prog.setPct(Math.round(pct));
-  }, 400);
+    pct += (97 - pct) * 0.02;
+    prog.setPct(Math.min(97, Math.round(pct)));
+    const elapsed = Date.now() - t0;
+    const extra = elapsed > 60000 ? ' — projetos grandes levam alguns minutos' : '';
+    prog.setStatus(`${lastStatus}  ⏱️ ${fmt(elapsed)}${extra}`);
+  }, 1000);
   try {
     while (true) {
       let job;
@@ -375,13 +385,13 @@ async function pollWithProgress(jobId, prog, name) {
         addMessage('bot', `❌ ${escapeHtml(e.message)}`);
         return;
       }
-      if (job.log && job.log.length) prog.setStatus(job.log[job.log.length - 1]);
+      if (job.log && job.log.length) lastStatus = job.log[job.log.length - 1];
       if (job.status === 'done') {
         clearInterval(anim);
         prog.setPct(100);
-        prog.setStatus('✅ Concluído!');
+        prog.setStatus(`✅ Concluído em ${fmt(Date.now() - t0)}`);
         const reply = (job.result && job.result.reply) || '(sem resposta)';
-        setTimeout(() => prog.remove(), 700);
+        setTimeout(() => prog.remove(), 900);
         addReport(reply, name);
         await Promise.all([loadSummary(), loadScans()]).catch(() => {});
         return;

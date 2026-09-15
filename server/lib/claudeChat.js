@@ -16,7 +16,7 @@ import { extractTarget } from './intent.js';
 
 const BIN = process.env.CLAUDE_BIN || 'claude';
 const TTL_MS = Number(process.env.CLAUDE_SESSION_TTL_MS || 5 * 60 * 1000);
-const TIMEOUT_MS = Number(process.env.CLAUDE_TIMEOUT_MS || 300_000);
+const TIMEOUT_MS = Number(process.env.CLAUDE_TIMEOUT_MS || 1_200_000); // 20 min (projetos grandes)
 // Ferramentas de LEITURA apenas (o Claude explora o código sem executar nada).
 const READ_TOOLS = 'Read Grep Glob LS';
 
