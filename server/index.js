@@ -51,8 +51,19 @@ if (PIN) {
   // Página de login sempre acessível.
   app.get('/login', (req, res) => res.sendFile(loginPage));
 
+  // Arquivos públicos do PWA (não sensíveis) liberados antes do login,
+  // para o app poder ser instalado já na tela de PIN.
+  const PUBLIC_PATHS = new Set([
+    '/manifest.webmanifest',
+    '/sw.js',
+    '/icon-192.png',
+    '/icon-512.png',
+    '/favicon.ico',
+  ]);
+
   // Trava tudo o que vier depois, exceto quem já tem o cookie válido.
   app.use((req, res, next) => {
+    if (PUBLIC_PATHS.has(req.path)) return next();
     const cookies = parseCookies(req.headers.cookie);
     if (cookies.striis_auth === TOKEN) return next();
     if (req.path.startsWith('/api/')) {

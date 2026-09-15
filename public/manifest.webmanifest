@@ -1,0 +1,17 @@
+{
+  "name": "STRIIS — Analista de Segurança",
+  "short_name": "STRIIS",
+  "description": "Envie o .zip do seu código e receba um relatório de segurança com IA.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#fbf6ec",
+  "theme_color": "#ffc21b",
+  "lang": "pt-BR",
+  "icons": [
+    { "src": "/icon-192.png", "type": "image/png", "sizes": "192x192", "purpose": "any" },
+    { "src": "/icon-512.png", "type": "image/png", "sizes": "512x512", "purpose": "any" },
+    { "src": "/icon-512.png", "type": "image/png", "sizes": "512x512", "purpose": "maskable" }
+  ]
+}
