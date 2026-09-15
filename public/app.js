@@ -416,11 +416,12 @@ async function uploadZip(file) {
     addMessage('bot', '❌ Envie um arquivo <strong>.zip</strong> do código.');
     return;
   }
-  addMessage('user', '📎 ' + escapeHtml(file.name));
+  const quick = !!(document.getElementById('quick-toggle') && document.getElementById('quick-toggle').checked);
+  addMessage('user', '📎 ' + escapeHtml(file.name) + (quick ? '  ⚡ (rápido)' : ''));
   const prog = addProgress('📦 Enviando o arquivo…');
   try {
     const res = await fetch(
-      `/api/chat/upload?conversationId=${encodeURIComponent(conversationId)}&name=${encodeURIComponent(file.name)}`,
+      `/api/chat/upload?conversationId=${encodeURIComponent(conversationId)}&name=${encodeURIComponent(file.name)}&mode=${quick ? 'quick' : 'full'}`,
       { method: 'POST', headers: { 'content-type': 'application/zip' }, body: file },
     );
     if (!res.ok) {

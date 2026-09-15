@@ -64,7 +64,7 @@ function startChatJob({ conversationId, message }) {
 }
 
 // Job em background: recebe o .zip, extrai e revisa o código.
-function startUploadJob({ conversationId, buf, label }) {
+function startUploadJob({ conversationId, buf, label, mode }) {
   const job = createJob({ type: 'upload', target: label });
   (async () => {
     const base = path.join(os.tmpdir(), 'striis-zip-' + Math.random().toString(36).slice(2, 10));
@@ -77,8 +77,13 @@ function startUploadJob({ conversationId, buf, label }) {
       await fsp.rm(zipPath, { force: true }).catch(() => {});
       const root = projectRoot(extractDir);
       appendLog(job.id, '📂 Projeto extraído — lendo os arquivos…');
-      appendLog(job.id, '🔎 Procurando vulnerabilidades (injeção, secrets, auth, XSS…)…');
-      const result = await reviewCodeDir({ conversationId, dir: root, label, cleanupDir: extractDir });
+      appendLog(
+        job.id,
+        mode === 'quick'
+          ? '⚡ Modo rápido — focando nos arquivos críticos (auth, rotas, config, .env)…'
+          : '🔎 Procurando vulnerabilidades (injeção, secrets, auth, XSS…)…',
+      );
+      const result = await reviewCodeDir({ conversationId, dir: root, label, cleanupDir: extractDir, mode });
       appendLog(job.id, '📝 Montando o relatório final…');
       finishJob(job.id, { result: { reply: result.reply, target: result.target, kind: 'upload' } });
     } catch (err) {
@@ -104,7 +109,8 @@ api.post(
     if (!buf || !buf.length) return res.status(400).json({ error: 'Envie um arquivo .zip no corpo.' });
     const conversationId = (req.query.conversationId || 'default').toString().slice(0, 100);
     const label = (req.query.name || 'codigo.zip').toString().slice(0, 120);
-    const job = startUploadJob({ conversationId, buf, label });
+    const mode = req.query.mode === 'quick' ? 'quick' : 'full';
+    const job = startUploadJob({ conversationId, buf, label, mode });
     res.status(202).json({ job: jobView(job.id) });
   },
 );

@@ -317,6 +317,7 @@ export async function reviewCodeDir({
   dir,
   label,
   cleanupDir = null,
+  mode = 'full', // 'full' (varre tudo) | 'quick' (foca nos arquivos críticos)
   message = 'Analise a segurança desta aplicação e encontre todas as falhas.',
 } = {}) {
   sweep();
@@ -330,8 +331,16 @@ export async function reviewCodeDir({
   }
 
   const prompt =
-    `${message}\n\nFaça a revisão de segurança completa deste código${label ? ` (${label})` : ''}. ` +
-    `Explore os arquivos e produza o relatório com os achados por severidade (arquivo:linha, problema, correção).`;
+    mode === 'quick'
+      ? `${message}\n\nFaça uma revisão de segurança RÁPIDA e FOCADA deste código${label ? ` (${label})` : ''}. ` +
+        `NÃO leia o projeto inteiro. Priorize os arquivos de MAIOR RISCO: ` +
+        `autenticação/login, rotas e endpoints (ex.: edge functions/serverless/controllers), ` +
+        `configurações e .env (segredos/credenciais expostos), acesso a banco de dados e regras de acesso (RLS/policies), ` +
+        `e tratamento de entrada do usuário (injeção, eval, upload). ` +
+        `Use grep para achar padrões perigosos (eval, service_role, api_key, password, secret, dangerouslySetInnerHTML) e leia só os arquivos relevantes. ` +
+        `Seja rápido (poucos minutos) e produza o relatório com os principais achados por severidade (arquivo:linha, problema, correção).`
+      : `${message}\n\nFaça a revisão de segurança completa deste código${label ? ` (${label})` : ''}. ` +
+        `Explore os arquivos e produza o relatório com os achados por severidade (arquivo:linha, problema, correção).`;
   const out = await runClaude(
     ['-p', prompt, '--append-system-prompt', SYSTEM_CODE, '--allowedTools', READ_TOOLS, '--output-format', 'json'],
     dir,
