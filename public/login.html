@@ -150,8 +150,14 @@
       }
       form.addEventListener('submit', (e) => { e.preventDefault(); submit(); });
 
+      // Não registramos o service worker aqui (tela de login é bloqueada e
+      // cacheava assets errados). O SW é registrado só no app, após o login.
+      // Se houver um SW antigo/ruim, remove para não servir cache quebrado.
       if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/sw.js').catch(() => {});
+        navigator.serviceWorker.getRegistrations().then((rs) => {
+          rs.forEach((r) => r.unregister());
+        }).catch(() => {});
+        if (window.caches) caches.keys().then((ks) => ks.forEach((k) => caches.delete(k))).catch(() => {});
       }
     </script>
   </body>

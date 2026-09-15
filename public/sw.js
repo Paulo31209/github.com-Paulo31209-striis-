@@ -1,57 +1,46 @@
-// Service worker do STRIIS (PWA).
-// Cacheia o "app shell" (estático) para instalar e abrir rápido.
-// Nunca cacheia /api/* nem navegações — segurança/estado sempre vêm do servidor.
+// Service worker do STRIIS (PWA) — network-first (sempre busca a versão fresca).
+// Cache serve só como fallback offline. Nunca intercepta /api/.
+// (v2: corrige cache ruim da v1 que podia guardar a tela de login no lugar dos assets.)
 
-const CACHE = 'striis-v1';
-const SHELL = [
-  '/',
-  '/index.html',
-  '/styles.css',
-  '/app.js',
-  '/manifest.webmanifest',
-  '/icon-192.png',
-  '/icon-512.png',
-];
+const CACHE = 'striis-v2';
 
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll(SHELL).catch(() => {})),
-  );
+self.addEventListener('install', () => {
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))),
-    ),
+    (async () => {
+      // Limpa TODOS os caches antigos (inclui a v1 que podia estar corrompida).
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+      await self.clients.claim();
+    })(),
   );
-  self.clients.claim();
 });
 
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   const url = new URL(req.url);
 
-  // Só cuida do próprio domínio.
-  if (url.origin !== self.location.origin) return;
+  if (url.origin !== self.location.origin) return; // só o próprio domínio
+  if (url.pathname.startsWith('/api/')) return; // API sempre na rede
+  if (req.method !== 'GET') return;
 
-  // API e navegações → sempre rede (não cachear estado/sessão).
-  if (url.pathname.startsWith('/api/') || req.mode === 'navigate') return;
-
-  // Estáticos → cache-first, atualizando em segundo plano.
+  // Network-first: tenta a rede (versão sempre atual); cacheia; cai pro cache só offline.
   event.respondWith(
-    caches.match(req).then((cached) => {
-      const fetchPromise = fetch(req)
-        .then((res) => {
-          if (res && res.status === 200 && res.type === 'basic') {
-            const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
-          }
-          return res;
-        })
-        .catch(() => cached);
-      return cached || fetchPromise;
-    }),
+    (async () => {
+      try {
+        const res = await fetch(req);
+        if (res && res.status === 200 && res.type === 'basic') {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
+        }
+        return res;
+      } catch {
+        const cached = await caches.match(req);
+        return cached || Response.error();
+      }
+    })(),
   );
 });
