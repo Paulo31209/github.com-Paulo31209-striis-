@@ -211,12 +211,23 @@ function addMessage(role, html) {
   return div;
 }
 
-// Converte **negrito** e *itálico* simples em HTML (após escapar).
+// Renderiza markdown simples (títulos, listas, negrito, itálico, código).
 function formatReply(text) {
-  return escapeHtml(text)
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    .replace(/\n/g, '<br>');
+  const lines = escapeHtml(String(text || '')).split('\n');
+  const html = lines.map((line) => {
+    let l = line
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>');
+    let m;
+    if ((m = l.match(/^###\s+(.*)$/))) return `<div class="md-h3">${m[1]}</div>`;
+    if ((m = l.match(/^##\s+(.*)$/))) return `<div class="md-h2">${m[1]}</div>`;
+    if ((m = l.match(/^#\s+(.*)$/))) return `<div class="md-h1">${m[1]}</div>`;
+    if ((m = l.match(/^\s*[-*]\s+(.*)$/))) return `<div class="md-li">${m[1]}</div>`;
+    if (l.trim() === '') return '<div class="md-sp"></div>';
+    return `<div>${l}</div>`;
+  });
+  return html.join('');
 }
 
 // Identificador de conversa (memória de 5 min no servidor), por navegador.
@@ -288,14 +299,115 @@ async function pollChatResult(jobId, typingEl) {
   }
 }
 
+let lastReport = null; // guarda o último relatório { md, name } para download
+
+// Cria um balão com barra de progresso e narração do que está acontecendo.
+function addProgress(status) {
+  const el = addMessage('bot progress-msg', '');
+  el.innerHTML =
+    '<div class="prog-status"></div>' +
+    '<div class="prog-bar"><div class="prog-fill"></div></div>' +
+    '<div class="prog-pct">0%</div>';
+  const statusEl = el.querySelector('.prog-status');
+  const fillEl = el.querySelector('.prog-fill');
+  const pctEl = el.querySelector('.prog-pct');
+  const api2 = {
+    el,
+    setStatus: (t) => (statusEl.textContent = t),
+    setPct: (p) => {
+      fillEl.style.width = p + '%';
+      pctEl.textContent = p + '%';
+    },
+    remove: () => el.remove(),
+  };
+  api2.setStatus(status || '⏳ Iniciando…');
+  return api2;
+}
+
+// Monta o markdown do relatório e faz o download no navegador.
+function downloadMd(reply, name) {
+  const base = (name || 'relatorio').replace(/\.zip$/i, '');
+  const md =
+    `# Relatório de Segurança — ${base}\n\n` +
+    `_Gerado pelo STRIIS em ${new Date().toLocaleString('pt-BR')}_\n\n---\n\n` +
+    `${reply}\n`;
+  const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `striis-${base}-${new Date().toISOString().slice(0, 10)}.md`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+// Mostra o relatório + botão de baixar .md.
+function addReport(reply, name) {
+  addMessage('bot', formatReply(reply));
+  lastReport = { reply, name };
+  const bar = document.createElement('div');
+  bar.className = 'report-actions';
+  const btn = document.createElement('button');
+  btn.className = 'btn primary';
+  btn.textContent = '📥 Baixar relatório (.md)';
+  btn.addEventListener('click', () => downloadMd(reply, name));
+  bar.appendChild(btn);
+  $('#assistant-log').appendChild(bar);
+  $('#assistant-log').scrollTop = $('#assistant-log').scrollHeight;
+}
+
+// Acompanha o job de upload com barra de progresso animada + narração.
+async function pollWithProgress(jobId, prog, name) {
+  let pct = 6;
+  const anim = setInterval(() => {
+    pct += (93 - pct) * 0.045; // sobe suave até ~93% enquanto processa
+    prog.setPct(Math.round(pct));
+  }, 400);
+  try {
+    while (true) {
+      let job;
+      try {
+        job = await api(`/jobs/${jobId}`);
+      } catch (e) {
+        clearInterval(anim);
+        prog.remove();
+        addMessage('bot', `❌ ${escapeHtml(e.message)}`);
+        return;
+      }
+      if (job.log && job.log.length) prog.setStatus(job.log[job.log.length - 1]);
+      if (job.status === 'done') {
+        clearInterval(anim);
+        prog.setPct(100);
+        prog.setStatus('✅ Concluído!');
+        const reply = (job.result && job.result.reply) || '(sem resposta)';
+        setTimeout(() => prog.remove(), 700);
+        addReport(reply, name);
+        await Promise.all([loadSummary(), loadScans()]).catch(() => {});
+        return;
+      }
+      if (job.status === 'error') {
+        clearInterval(anim);
+        prog.remove();
+        addMessage('bot', `❌ ${escapeHtml(job.error || 'erro na análise')}`);
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 2500));
+    }
+  } finally {
+    clearInterval(anim);
+  }
+}
+
 // Upload de um .zip do código → revisão de segurança completa pelo Claude.
 async function uploadZip(file) {
   if (!file) return;
+  if (!/\.zip$/i.test(file.name)) {
+    addMessage('bot', '❌ Envie um arquivo <strong>.zip</strong> do código.');
+    return;
+  }
   addMessage('user', '📎 ' + escapeHtml(file.name));
-  const typing = addMessage(
-    'bot typing',
-    '📦 Descompactando e analisando o código… (pode levar alguns minutos)',
-  );
+  const prog = addProgress('📦 Enviando o arquivo…');
   try {
     const res = await fetch(
       `/api/chat/upload?conversationId=${encodeURIComponent(conversationId)}&name=${encodeURIComponent(file.name)}`,
@@ -307,13 +419,13 @@ async function uploadZip(file) {
     }
     const data = await res.json();
     if (data.job) {
-      await pollChatResult(data.job.id, typing);
+      await pollWithProgress(data.job.id, prog, file.name);
       return;
     }
-    typing.remove();
-    addMessage('bot', formatReply(data.reply || '(sem resposta)'));
+    prog.remove();
+    addReport(data.reply || '(sem resposta)', file.name);
   } catch (e) {
-    typing.remove();
+    prog.remove();
     addMessage('bot', `❌ ${escapeHtml(e.message)}`);
   }
 }

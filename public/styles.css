@@ -568,3 +568,49 @@ footer {
   color: var(--text-dim);
   font-weight: 600;
 }
+
+/* Barra de progresso da análise */
+.msg.progress-msg {
+  align-self: stretch;
+  max-width: 100%;
+  background: var(--panel);
+  border: 1px solid var(--border);
+}
+.prog-status { font-size: 13.5px; font-weight: 700; color: var(--heading); margin-bottom: 10px; }
+.prog-bar {
+  height: 12px;
+  background: var(--bg-pattern);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.prog-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 8px;
+  background: linear-gradient(90deg, var(--brand), var(--brand-strong));
+  transition: width 0.4s ease;
+  background-size: 200% 100%;
+  animation: progshine 1.4s linear infinite;
+}
+@keyframes progshine { from { background-position: 200% 0; } to { background-position: 0 0; } }
+.prog-pct { text-align: right; font-size: 12px; font-weight: 800; color: var(--text-dim); margin-top: 6px; font-variant-numeric: tabular-nums; }
+
+/* Ações do relatório (baixar .md) */
+.report-actions { align-self: flex-start; margin-top: -2px; }
+.report-actions .btn { font-size: 13px; }
+
+/* Markdown renderizado nas mensagens */
+.md-h1 { font-family: var(--display); font-size: 17px; font-weight: 800; color: var(--heading); margin: 6px 0 4px; }
+.md-h2 { font-family: var(--display); font-size: 15px; font-weight: 700; color: var(--heading); margin: 10px 0 3px; }
+.md-h3 { font-size: 13.5px; font-weight: 800; color: var(--heading); margin: 8px 0 2px; }
+.md-li { padding-left: 16px; position: relative; margin: 2px 0; }
+.md-li::before { content: "•"; position: absolute; left: 2px; color: var(--brand-strong); font-weight: 800; }
+.md-sp { height: 7px; }
+.msg code {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  background: var(--bg-pattern);
+  padding: 1px 5px;
+  border-radius: 5px;
+  color: #b5561a;
+}

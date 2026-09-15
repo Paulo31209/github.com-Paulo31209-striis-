@@ -71,13 +71,15 @@ function startUploadJob({ conversationId, buf, label }) {
     const zipPath = base + '.zip';
     const extractDir = base;
     try {
-      appendLog(job.id, '📦 Descompactando…');
+      appendLog(job.id, '📦 Recebido — descompactando o projeto…');
       await fsp.writeFile(zipPath, buf);
       unzipTo(zipPath, extractDir);
       await fsp.rm(zipPath, { force: true }).catch(() => {});
       const root = projectRoot(extractDir);
-      appendLog(job.id, '🔎 Analisando o código com o Claude… (pode levar alguns minutos)');
+      appendLog(job.id, '📂 Projeto extraído — lendo os arquivos…');
+      appendLog(job.id, '🔎 Procurando vulnerabilidades (injeção, secrets, auth, XSS…)…');
       const result = await reviewCodeDir({ conversationId, dir: root, label, cleanupDir: extractDir });
+      appendLog(job.id, '📝 Montando o relatório final…');
       finishJob(job.id, { result: { reply: result.reply, target: result.target, kind: 'upload' } });
     } catch (err) {
       await fsp.rm(extractDir, { recursive: true, force: true }).catch(() => {});
